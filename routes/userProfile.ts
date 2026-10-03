@@ -21,6 +21,18 @@ function favicon () {
   return utils.extractFilename(config.get('application.favicon'))
 }
 
+function escapeTemplate (str: string | undefined): string | undefined {
+  if (str === undefined || str === null) {
+    return str
+  }
+  return str
+    .replace(/\0/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/(^|\n)\\?/g, (_, p1) => `${p1}\\`)
+    .replace(/\\?([#!]{|#\[)/g, (_, p1) => `\\${p1}`)
+}
+
 export function getUserProfile () {
   return async (req: Request, res: Response, next: NextFunction) => {
     let template: string
@@ -73,19 +85,19 @@ export function getUserProfile () {
         if (!isSafe) {
           throw new Error('Unsafe code execution blocked')
         }
-        username = eval(code) // eslint-disable-line no-eval
+        username = escapeTemplate(String(eval(code))) // eslint-disable-line no-eval
       } catch (err) {
-        username = '\\' + username
+        username = escapeTemplate(username)
       }
     } else {
-      username = '\\' + username
+      username = escapeTemplate(username)
     }
 
     const themeKey = config.get<string>('application.theme') as keyof typeof themes
     const theme = themes[themeKey] || themes['bluegrey-lightgreen']
 
     if (username) {
-      template = template.replace(/_username_/g, username)
+      template = template.replace(/_username_/g, () => username)
     }
     template = template.replace(/_emailHash_/g, security.hash(user?.email))
     template = template.replace(/_title_/g, entities.encode(config.get<string>('application.name')))
